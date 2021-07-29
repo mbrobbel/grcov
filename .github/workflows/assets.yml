@@ -1,0 +1,98 @@
+name: Assets
+
+on:
+  push:
+  release:
+    types:
+    - created
+
+jobs:
+  darwin:
+    name: Darwin
+    runs-on: macos-latest
+    steps:
+    - uses: actions/checkout@v2
+    - uses: actions-rs/toolchain@v1
+      with:
+        profile: minimal
+        toolchain: stable
+        components: llvm-tools-preview
+        override: true
+    - uses: actions-rs/cargo@v1
+      with:
+        command: build
+        args: --release
+    - name: Create archive
+      run: tar -C target/release -cJf grcov-x86_64-apple-darwin.tar.bz2 grcov
+    - uses: actions/upload-release-asset@v1.0.1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ github.event.release.upload_url }}
+        asset_path: grcov-x86_64-apple-darwin.tar.bz2
+        asset_name: grcov-x86_64-apple-darwin.tar.bz2
+        asset_content_type: application/gzip
+
+  linux:
+    name: Linux
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        target:
+          - x86_64-unknown-linux-gnu
+          - x86_64-unknown-linux-musl
+          - x86_64-pc-windows-gnu
+    steps:
+    - uses: actions/checkout@v2
+    - uses: actions-rs/toolchain@v1
+      with:
+        profile: minimal
+        toolchain: stable
+        target: ${{ matrix.target }}
+        components: llvm-tools-preview
+        override: true
+    - uses: actions-rs/cargo@v1
+      with:
+        command: build
+        args: --release --target ${{ matrix.target }}
+        use-cross: true
+    - name: Create archive
+      working-directory: ./target/${{ matrix.target }}/release
+      run: |
+        shopt -s extglob
+        tar -cJf ../../../grcov-${{ matrix.target }}.tar.bz2 @(grcov|grcov.exe)
+    - uses: actions/upload-release-asset@v1.0.1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ github.event.release.upload_url }}
+        asset_path: grcov-${{ matrix.target }}.tar.bz2
+        asset_name: grcov-${{ matrix.target }}.tar.bz2
+        asset_content_type: application/gzip
+
+  windows:
+    name: Windows
+    runs-on: windows-latest
+    steps:
+    - uses: actions/checkout@v2
+    - uses: actions-rs/toolchain@v1
+      with:
+        profile: minimal
+        toolchain: stable
+        components: llvm-tools-preview
+        override: true
+    - uses: actions-rs/cargo@v1
+      with:
+        command: build
+        args: --release --bin grcov --features=cli
+    - name: Create archive
+      run: Compress-Archive target\release\grcov.exe grcov-x86_64-pc-windows-msvc.zip
+    - uses: actions/upload-release-asset@v1.0.1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ github.event.release.upload_url }}
+        asset_path: grcov-x86_64-pc-windows-msvc.zip
+        asset_name: grcov-x86_64-pc-windows-msvc.zip
+        asset_content_type: application/zip
+  
